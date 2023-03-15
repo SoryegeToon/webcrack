@@ -218,4 +218,4 @@ def run(url):
     browser.quit()
 
 if __name__=='__main__':
-    run('https://60.173.17.250:7002/login#/')
+    run('https://www.baidu.com/')
