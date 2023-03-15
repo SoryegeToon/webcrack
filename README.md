@@ -5,3 +5,4 @@
 ## 登陆框识别
 先无脑识别css元素下的button与input点击，面对多个button的网站(如nps登陆页面)选择遍历button按钮，遇到关于“登陆，login“关键字再去点击 暂未解决那种按钮是图片贴上去的暂时放弃了
 ## 效果
+![image](​https://github.com/SoryegeToon/webcrack/blob/main/pic/1.jpg​​)
